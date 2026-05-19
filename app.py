@@ -29,6 +29,14 @@ app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-change-me-in-production")
 
 
+def parse_mysql_host_and_port(host, port):
+    if host and ":" in host and not host.startswith("["):
+        maybe_host, maybe_port = host.rsplit(":", 1)
+        if maybe_port.isdigit():
+            return maybe_host, int(maybe_port)
+    return host, int(port)
+
+
 def load_database_config():
     database_url = os.environ.get("DATABASE_URL")
     if database_url:
@@ -43,9 +51,13 @@ def load_database_config():
             "MYSQL_DB": (parsed.path or "/finance_tracker").lstrip("/"),
         }
 
+    host, port = parse_mysql_host_and_port(
+        os.environ.get("MYSQL_HOST", "localhost"),
+        os.environ.get("MYSQL_PORT", "3306"),
+    )
     return {
-        "MYSQL_HOST": os.environ.get("MYSQL_HOST", "localhost"),
-        "MYSQL_PORT": int(os.environ.get("MYSQL_PORT", "3306")),
+        "MYSQL_HOST": host,
+        "MYSQL_PORT": port,
         "MYSQL_USER": os.environ.get("MYSQL_USER", "root"),
         "MYSQL_PASSWORD": os.environ.get("MYSQL_PASSWORD", ""),
         "MYSQL_DB": os.environ.get("MYSQL_DB", "finance_tracker"),
@@ -457,6 +469,30 @@ def index():
 @app.route("/healthz")
 def healthz():
     return {"status": "ok"}
+
+
+@app.route("/healthz/db")
+def healthz_db():
+    try:
+        connection = get_connection()
+        connection.close()
+    except pymysql.MySQLError as error:
+        return {
+            "status": "error",
+            "database": app.config["MYSQL_DB"],
+            "host": app.config["MYSQL_HOST"],
+            "port": app.config["MYSQL_PORT"],
+            "user": app.config["MYSQL_USER"],
+            "error": str(error),
+        }, 503
+
+    return {
+        "status": "ok",
+        "database": app.config["MYSQL_DB"],
+        "host": app.config["MYSQL_HOST"],
+        "port": app.config["MYSQL_PORT"],
+        "user": app.config["MYSQL_USER"],
+    }
 
 
 @app.route("/register", methods=["GET", "POST"])

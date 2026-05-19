@@ -30,3 +30,15 @@ Many hosted MySQL providers also give a single connection string. You can set th
 The app uses MySQL. A local database host such as `localhost` will not work on Render. Use a MySQL database that is reachable from Render, then run `database.sql` on that database before opening the app.
 
 Render's managed PostgreSQL database is not compatible with this app unless the SQL queries and schema are migrated from MySQL to PostgreSQL.
+
+## Troubleshooting
+
+After deployment, open `/healthz/db` on your Render app URL. It returns the configured database host, port, user, database name, and the MySQL connection error without exposing the password.
+
+Common fixes:
+
+- Do not use `localhost` for `MYSQL_HOST` on Render.
+- If your provider gives `host:port`, paste it into `MYSQL_HOST`; the app will split it automatically.
+- If your provider gives a connection URL, set `DATABASE_URL` instead.
+- Set `MYSQL_SSL=true` if your provider requires SSL.
+- Make sure `database.sql` has been run on the hosted MySQL database.
