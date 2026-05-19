@@ -6,6 +6,7 @@ Keeps routes readable; database access is grouped in helpers for clarity.
 import os
 from datetime import date, datetime
 from functools import wraps
+from urllib.parse import unquote, urlparse
 
 import pymysql
 from dotenv import load_dotenv
@@ -26,21 +27,50 @@ load_dotenv()
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-change-me-in-production")
-app.config["MYSQL_HOST"] = os.environ.get("MYSQL_HOST", "localhost")
-app.config["MYSQL_USER"] = os.environ.get("MYSQL_USER", "root")
-app.config["MYSQL_PASSWORD"] = os.environ.get("MYSQL_PASSWORD", "")
-app.config["MYSQL_DB"] = os.environ.get("MYSQL_DB", "finance_tracker")
+
+
+def load_database_config():
+    database_url = os.environ.get("DATABASE_URL")
+    if database_url:
+        parsed = urlparse(database_url)
+        if parsed.scheme not in {"mysql", "mysql+pymysql"}:
+            raise RuntimeError("DATABASE_URL must use mysql:// or mysql+pymysql://")
+        return {
+            "MYSQL_HOST": parsed.hostname or "localhost",
+            "MYSQL_PORT": parsed.port or 3306,
+            "MYSQL_USER": unquote(parsed.username or ""),
+            "MYSQL_PASSWORD": unquote(parsed.password or ""),
+            "MYSQL_DB": (parsed.path or "/finance_tracker").lstrip("/"),
+        }
+
+    return {
+        "MYSQL_HOST": os.environ.get("MYSQL_HOST", "localhost"),
+        "MYSQL_PORT": int(os.environ.get("MYSQL_PORT", "3306")),
+        "MYSQL_USER": os.environ.get("MYSQL_USER", "root"),
+        "MYSQL_PASSWORD": os.environ.get("MYSQL_PASSWORD", ""),
+        "MYSQL_DB": os.environ.get("MYSQL_DB", "finance_tracker"),
+    }
+
+
+app.config.update(load_database_config())
 
 
 def get_connection():
-    return pymysql.connect(
-        host=app.config["MYSQL_HOST"],
-        user=app.config["MYSQL_USER"],
-        password=app.config["MYSQL_PASSWORD"],
-        database=app.config["MYSQL_DB"],
-        cursorclass=DictCursor,
-        charset="utf8mb4",
-    )
+    connect_args = {
+        "host": app.config["MYSQL_HOST"],
+        "port": app.config["MYSQL_PORT"],
+        "user": app.config["MYSQL_USER"],
+        "password": app.config["MYSQL_PASSWORD"],
+        "database": app.config["MYSQL_DB"],
+        "cursorclass": DictCursor,
+        "charset": "utf8mb4",
+        "connect_timeout": 10,
+    }
+
+    if os.environ.get("MYSQL_SSL", "").lower() in {"1", "true", "yes", "required"}:
+        connect_args["ssl"] = {}
+
+    return pymysql.connect(**connect_args)
 
 
 def get_db():
