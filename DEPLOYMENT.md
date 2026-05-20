@@ -8,37 +8,25 @@ This app is configured for Render with `render.yaml`.
 - Start command: `gunicorn app:app`
 - Health check path: `/healthz`
 
-## Required environment variables
+## PostgreSQL setup
 
-Set these in Render before deploying:
+Set this environment variable in Render:
 
-- `MYSQL_HOST`
-- `MYSQL_PORT` (usually `3306`)
-- `MYSQL_USER`
-- `MYSQL_PASSWORD`
-- `MYSQL_DB`
-- `MYSQL_SSL` (`true` if your MySQL provider requires SSL, otherwise `false`)
+- `DATABASE_URL`
 
-Many hosted MySQL providers also give a single connection string. You can set this instead of the separate MySQL fields:
+Use the PostgreSQL internal connection URL from your Render database. Do not commit the URL to GitHub because it contains the database password.
 
-- `DATABASE_URL=mysql://user:password@host:3306/database_name`
+## Initialize the database
 
-`SECRET_KEY` is generated automatically by the Render blueprint.
-
-## Database note
-
-The app uses MySQL. A local database host such as `localhost` will not work on Render. Use a MySQL database that is reachable from Render, then run `database.sql` on that database before opening the app.
-
-Render's managed PostgreSQL database is not compatible with this app unless the SQL queries and schema are migrated from MySQL to PostgreSQL.
+The app creates the required tables automatically on first database use. `database.sql` is also included if you prefer to initialize the schema manually from Render's database shell or another PostgreSQL client.
 
 ## Troubleshooting
 
-After deployment, open `/healthz/db` on your Render app URL. It returns the configured database host, port, user, database name, and the MySQL connection error without exposing the password.
+After deployment, open `/healthz/db` on your Render app URL. It returns the configured database host, port, user, database name, and the PostgreSQL connection error without exposing the password.
 
 Common fixes:
 
-- Do not use `localhost` for `MYSQL_HOST` on Render.
-- If your provider gives `host:port`, paste it into `MYSQL_HOST`; the app will split it automatically.
-- If your provider gives a connection URL, set `DATABASE_URL` instead.
-- Set `MYSQL_SSL=true` if your provider requires SSL.
-- Make sure `database.sql` has been run on the hosted MySQL database.
+- Make sure `DATABASE_URL` starts with `postgresql://` or `postgres://`.
+- Use the Render PostgreSQL internal URL when the web service and database are in the same Render region.
+- Open `/healthz/db` after deployment to confirm the app can connect and initialize the schema.
+- If tables already exist from an older failed setup, drop/recreate them or run the schema manually.
