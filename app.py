@@ -51,6 +51,15 @@ app.config.update(load_database_config())
 _schema_ready = False
 
 
+def database_error_message():
+    if app.config["DB_HOST"] in {"localhost", "127.0.0.1"} and os.environ.get("RENDER"):
+        return (
+            "DATABASE_URL is not set on Render. Add your Render PostgreSQL "
+            "connection string in the service Environment settings."
+        )
+    return "Open /healthz/db to see the exact PostgreSQL connection error."
+
+
 def get_connection():
     return psycopg.connect(
         app.config["DATABASE_URL"],
@@ -583,7 +592,7 @@ def register():
             flash("Username or email already registered.", "error")
         except psycopg.OperationalError:
             flash(
-                "Could not connect to the database. Check PostgreSQL is running and DATABASE_URL is set.",
+                f"Could not connect to the database. {database_error_message()}",
                 "error",
             )
 
@@ -612,7 +621,7 @@ def login():
                 )
                 row = cur.fetchone()
         except psycopg.OperationalError:
-            flash("Database connection failed. Verify PostgreSQL and DATABASE_URL.", "error")
+            flash(f"Database connection failed. {database_error_message()}", "error")
             return render_template("login.html")
 
         if row and check_password_hash(row["password"], password):
